@@ -30,7 +30,15 @@ def sigmoid(z: np.ndarray) -> np.ndarray:
         `sigmoid(np.array([-1000.0, 1000.0]))` must return finite numbers,
         never `nan`.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+    result = np.empty_like(z)
+    for i, logit in enumerate(z):
+        if logit >= 0:
+            result[i] = 1 / (1 + np.exp(-logit))
+        else:
+            result[i] = np.exp(logit) / (np.exp(logit) + 1)
+
+    return result
 # ============================ END TODO (Task 1) ==============================
 
 
@@ -51,7 +59,22 @@ def softmax_loop(z: list) -> list:
     Requirement: the result must be finite for large-magnitude inputs.
         `softmax_loop([1000.0, 1001.0])` must not raise `OverflowError`.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    result = []
+    max_logit = max(z)
+    
+    for logit in z:
+        result.append(math.exp(logit - max_logit))
+
+    exp_sum = sum(result)
+
+    for i, e_logit_minus_max in enumerate(result):
+        result[i] = e_logit_minus_max / exp_sum
+    
+    return result
+
+
 # ============================ END TODO (Task 2) ==============================
 
 
@@ -71,7 +94,15 @@ def softmax_np(z: np.ndarray) -> np.ndarray:
     Requirement: the result must be finite for large-magnitude inputs.
         `softmax_np(np.array([1000.0, 1001.0]))` must not contain `nan`.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    max_logit = np.max(z)
+    result = np.exp(z-max_logit)
+    exp_sum = np.sum(result)
+    result /= exp_sum
+    
+    return result
+
 # ============================ END TODO (Task 3) ==============================
 
 
@@ -91,7 +122,14 @@ def entropy(p: np.ndarray) -> float:
         0 * log(0) = 0, so the result stays finite (never `nan`, never `inf`).
         A one-hot `p` must give exactly 0.0.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    result = np.zeros_like(p, dtype=float)
+    np.log(p, out=result, where=(p > 0))
+    result *= p
+    
+    return float(-np.sum(result))
+
 # ============================ END TODO (Task 4) ==============================
 
 
@@ -116,7 +154,13 @@ def cross_entropy(p: np.ndarray, q: np.ndarray) -> float:
         probability you take the logarithm of; Task 6 must use the same value.
         Do not modify the inputs in place.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    log_q = np.log(np.maximum(q, 1e-12))
+    result = p * log_q
+    
+    return float(-np.sum(result))
+
 # ============================ END TODO (Task 5) ==============================
 
 
@@ -137,7 +181,15 @@ def kl_divergence(p: np.ndarray, q: np.ndarray) -> float:
         must satisfy the identity D_KL(p || q) = H(p, q) - H(p); a test
         checks it against your own `cross_entropy` and `entropy`.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+    result = np.zeros_like(p, dtype=float)
+    mask = p > 0
+
+    q_safe = np.maximum(q, 1e-12)
+    result[mask] = p[mask] * np.log(p[mask] / q_safe[mask])
+    
+    return float(np.sum(result))
+
 # ============================ END TODO (Task 6) ==============================
 
 
@@ -170,7 +222,28 @@ def focal_loss(p: np.ndarray, q: np.ndarray, gamma: float = 2.0,
     Requirement: with `gamma=0` and `alpha=None` this must return exactly the
         same value as `cross_entropy(p, q)` — a test checks that.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # each class k -> target weight * class weight * focal factor * log probability
+
+    # q <- maximum(q, 1e-12)
+    q_safe = np.maximum(q, 1e-12)
+    log_q = np.log(q_safe)
+    
+    # each class focal factor: (1 - q_k)^gamma
+    ff = np.power(1 - q_safe, gamma)
+
+    # each class loss: - (1 - q_k)^gamma * log(q_k)
+    each_class_loss = -ff * log_q
+    each_class_loss *= p
+
+    # if (alpha != None) -> *= alpha[k]
+    if (alpha is not None):
+        each_class_loss *= alpha
+
+    # all class sum
+    return float(np.sum(each_class_loss))
+
 # ============================ END TODO (Task 7) ==============================
 
 
