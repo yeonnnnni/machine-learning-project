@@ -10,12 +10,13 @@
 >
 > Delete these instruction lines before exporting.
 
-# Lab 1 Report — {Student ID} {Name}
+# Lab 1 Report — {20231879} {이정연(LeeJeongyeon)}
 
 ## 1. What I did
 
 (2–3 sentences. Only what is not obvious from the skeleton: a deviation, an extension, or a
 decision you had to make.)
+
 
 ## 2. Results
 
