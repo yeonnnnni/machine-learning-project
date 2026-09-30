@@ -16,8 +16,8 @@ from pathlib import Path
 import numpy as np
 
 # ---- Fill in your information (used in results.json) ----
-STUDENT_ID = "00000000"   # TODO: your student id, e.g. "20261234"
-STUDENT_NAME = "None"     # TODO: your name in Korean or roman letters — "홍길동" / "HongGildong"
+STUDENT_ID = "20231879"   # TODO: your student id, e.g. "20261234"
+STUDENT_NAME = "LeeJeongyeon"     # TODO: your name in Korean or roman letters — "홍길동" / "HongGildong"
 
 SEED = 42  # fixed for the whole course — DO NOT CHANGE
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "lab03_scene.npz"
@@ -131,7 +131,121 @@ def kmeans(X: np.ndarray, k: int, rng: np.random.Generator,
         (centers, labels, inertia): centers (k, d) float64,
         labels (N,) int64, inertia plain Python float.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # input: X: (N, 3) points, k: cluster 개수, rng, n_init: number of restarts, max_iter: max iterations
+    # output: centers (k, 3), labels (N,) 각 point가 어느 cluster에 들어갔는지, inertia: K-means의 최종 cost
+    #   inertia: 각 point와 그 point가 속한 cluster center와의 거리의 제곱합
+    
+    N = X.shape[0]
+    d = X.shape[1]
+
+    # 가장 좋은 것 저장
+    best_inertia = float("inf")
+    best_centers = None
+    best_labels = None
+
+    # One restart (repeated n_init times, one after another on the same rng):
+    for _ in range(n_init):
+        centers = np.empty((k, d), dtype=np.float64)
+        # center들 고르고
+    #   A. k-means++ seeding:
+    #   1. First center: idx = rng.integers(N); centers[0] = X[idx].
+        idx = rng.integers(N)
+        centers[0] = X[idx]
+
+    #   2. For each next center j = 1 .. k-1:
+        for j in range(1, k):
+            diff = X[:, None, :] - centers[None, :j, :]
+            dist2 = np.sum(diff**2, axis = 2)
+
+    #       d2[i] = min over already chosen centers c of ||X[i] - c||^2.
+            # 각 point에 대해 지금까지 선택된 center들 중 가장 가까운 center까지의 거리 제곱
+            d2 = np.min(dist2, axis=1)
+    #           If d2.sum() == 0 (all points coincide with a chosen center):
+            # d2==0이면 모든 point가 이미 선택된 center와 일치한다는 의미 -> 다음 center를 선택할 수 없으므로 랜덤하게 선택
+            if d2.sum() == 0:
+    #                 idx = rng.integers(N).
+                idx = rng.integers(N)
+    #             Else:
+    #                 idx = rng.choice(N, p=d2 / d2.sum())   # D^2 sampling
+    #             centers[j] = X[idx].
+            # 아니라면 D^2 sampling을 통해 다음 center를 선택
+            # center와의 거리가 먼 point일수록 다음 center로 선택될 확률이 높음
+            else:
+                idx = rng.choice(N, p=d2 / d2.sum())
+            centers[j] = X[idx]
+
+        #     B. Lloyd iterations (at most max_iter):
+        prev_labels = None
+        for _ in range(max_iter):
+            # center 초기화 끝. 이제 K-means 시작
+        #         1. Assign: labels[i] = argmin_j ||X[i] - centers[j]||^2
+        #             (ties -> the smallest j, which is what np.argmin does).
+            # 각 point를 가장 가까운 center에 배정
+            # X.shape = (N, d), centers.shape = (k, d)
+            diff = X[:, None, :] - centers[None, :, :]
+            dist2 = np.sum(diff ** 2, axis=2)
+            labels = np.argmin(dist2, axis=1)
+
+        #         2. Empty-cluster fix: 
+            # point가 하나도 없는 cluster가 있으면 mean 계산할 때 문제가 생김. -> 강제로 point 하나 넣기
+            # center에서 가장 멀리 떨어진 point를 cluster에 넣고, 그 point를 새로운 center로 두기.
+        # let d2a[i] = squared distance from X[i] to
+        #             its assigned center (the centers used in step 1). 
+        # d2a: 각 point가 자기 center까지 떨어진 거리의 제곱
+            d2a = dist2[np.arange(N), labels].copy()
+
+        # For each empty cluster j in ASCENDING order:
+        #                 sel = argmax_i d2a[i]   (ties -> smallest i)
+        #                 labels[sel] = j; centers[j] = X[sel]; d2a[sel] = -1.0
+        #             so the same point is never taken for two empty clusters.
+        # empty cluster 찾고
+        # empty마다 가장 멀리 떨어진 point 가져오기
+            counts = np.bincount(labels, minlength = k)
+            empty_clusters = np.flatnonzero(counts == 0)
+
+            for j in empty_clusters:
+                sel = np.argmax(d2a)
+                labels[sel] = j
+                centers[j] = X[sel]
+                d2a[sel] = -1.0
+
+        #         3. Converge: if this is not the first iteration and labels are
+        #             identical to the previous iteration's labels, STOP (before
+        #             updating the centers — they are already the means of these
+        #             members from the previous update).
+        # 이전 labels와 같으면 break
+            if prev_labels is not None:
+                if np.array_equal(labels, prev_labels):
+                    break
+
+
+        #         4. Update: centers[j] = mean of the points with labels == j.
+        # 각 cluster point 평균으로 center update
+        # 현재 labels를 prev_labels에 복사
+            for j in range(k):
+                centers[j] = X[labels == j].mean(axis=0)
+            prev_labels = labels.copy()
+
+        #     C. Inertia: sum_i ||X[i] - centers[labels[i]]||^2 with the final
+        #         centers and labels of this restart.
+        # 모든 point와 자기 최종 center 거리 제곱의 합
+        inertia = float(((X - centers[labels]) ** 2).sum())
+
+        # 현재 inertia가 best보다 작으면 현재 centers/labels/inertia에 저장
+        if inertia < best_inertia:
+            best_inertia = inertia
+            best_centers = centers.copy()
+            best_labels = labels.copy()
+
+    # best 결과 반환
+    return best_centers, best_labels, best_inertia
+
+
+
+
+
 # ============================ END TODO (Task 1) ==============================
 
 
@@ -187,7 +301,128 @@ def gmm_em(X: np.ndarray, k: int, rng: np.random.Generator,
         the parameters after the last M-step and the responsibilities of the
         last E-step; log_likelihoods = list of max_iter plain Python floats.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # input: X: (N, d), k: number of components, 
+    #        rng: np.random.Generator, max_iter: number of EM iterations, 
+    #        reg: covariance regularization
+
+    # output: means, covs, weights, resp, log_likelihoods
+
+    # 1. K-means로 GMM parameter 초기화
+    # 2. E-step: 각 point가 각 Gaussian에 속할 확률(resp) 계산
+    # 3. M-step: resp를 이용해 mean/covariance/weight 갱신
+    # 4. 2~3을 max_iter번 반복
+
+    N, d = X.shape
+
+    # Initialization (from one kmeans run):
+    #     centers, labels, _ = kmeans(X, k, rng)          # default n_init
+    #     means = centers
+    #     weights[j] = N_j / N          (N_j = members of cluster j)
+    #     covs[j] = (1/N_j) * sum_{i in j} (X[i]-centers[j])(X[i]-centers[j])^T
+    #               + reg * I
+
+    centers, labels, _ = kmeans(X, k, rng)
+    means = centers.copy()
+
+    # 각 cluster마다:
+        # weight 계산
+        # covariance 계산
+        # covariance에 reg*I 추가
+
+    weights = np.empty(k, dtype=np.float64)
+    covs = np.empty((k, d, d), dtype=np.float64)
+    I = np.eye(d, dtype=np.float64)
+
+    for j in range(k):
+        mask = labels == j
+        Nj = np.sum(mask)
+
+        weights[j] = Nj / N
+        diff = X[mask] - means[j]
+        covs[j] = (diff.T @ diff) / Nj + reg * I
+        
+    log_likelihoods = []
+
+    # One EM iteration (repeated exactly max_iter times):
+    # max_iter번 반복:
+    for _ in range(max_iter):
+    #     E-step, IN LOG SPACE (this is not optional): for every i, j
+    #         logp[i, j] = log weights[j] + log N(X[i] | means[j], covs[j])
+    #     and the per-point normalizer via LOG-SUM-EXP:
+    #         m[i] = max_j logp[i, j]
+    #         lse[i] = m[i] + log( sum_j exp(logp[i, j] - m[i]) )
+    #     resp[i, j] = exp(logp[i, j] - lse[i])           # rows sum to 1
+    #     Append ll = sum_i lse[i] to the trace (the log-likelihood of the
+    #     CURRENT parameters, i.e., before this iteration's M-step).
+    #     Why log space: log-densities of far components reach the -10^2..-10^8
+    #     range; exponentiating them before normalizing underflows to 0 for
+    #     every component at once on wide-dynamic-range scenes, giving 0/0
+    #     responsibilities and log(0) likelihoods. Subtracting the row maximum
+    #     first makes the largest term exp(0) = 1, which never underflows.
+
+        # [E-step]
+        logp = np.empty((N, k), dtype=np.float64)
+        # 각 component j마다:
+        for j in range(k):
+        #     모든 point의 Gaussian log probability 계산
+            diff = X - means[j]
+            sign, logdet = np.linalg.slogdet(covs[j])
+            solved = np.linalg.solve(covs[j], diff.T).T
+            quad = np.sum(diff * solved, axis=1)
+            log_gaussian = -0.5 * (
+                d * np.log(2.0 * np.pi)
+                + logdet
+                + quad
+            )
+            
+        #     log(weight)도 더함
+        #     logp[:, j]에 저장
+            logp[:, j] = np.log(weights[j]) + log_gaussian
+
+        # log-sum-exp로 normalization
+        m = np.max(logp, axis=1)
+        lse = m + np.log(np.exp(logp - m[:, None]).sum(axis=1))
+
+        # responsibility 계산
+        resp = np.exp(logp - lse[:, None])
+
+        # current log-likelihood 기록
+        ll = float(np.sum(lse))
+        log_likelihoods.append(ll)
+
+
+
+    #     M-step (closed forms):
+    #         Nk[j] = sum_i resp[i, j]
+    #         weights[j] = Nk[j] / N
+    #         means[j] = (sum_i resp[i, j] * X[i]) / Nk[j]
+    #         covs[j] = (sum_i resp[i, j] * (X[i]-means[j])(X[i]-means[j])^T)
+    #                   / Nk[j] + reg * I      # the NEW means[j]; reg added here
+
+        # [M-step]
+
+        # Nk 계산
+        Nk = np.sum(resp, axis=0)
+
+        # weights update
+        weights = Nk / N
+
+        # means update
+        means = (resp.T @ X) / Nk[:, None]
+
+        new_covs = np.empty_like(covs)
+        # 각 component마다:
+        for j in range(k):
+        #     새 mean을 기준으로 covariance update
+            diff = X - means[j]
+            weighted_diff = diff * resp[:, j][:, None]
+            new_covs[j] = ((weighted_diff.T @ diff) / Nk[j] + reg * I)
+        covs = new_covs
+
+    return means, covs, weights, resp, log_likelihoods
+
 # ============================ END TODO (Task 2) ==============================
 
 
@@ -205,7 +440,15 @@ def bic(ll: float, n_params: int, n: int) -> float:
     Returns:
         The BIC value as a plain Python float.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # input: ll, n_params, n
+    # output: BIC
+        # 작을수록 좋음.
+
+    BIC = float(-2.0 * ll + n_params * np.log(n))
+
+    return BIC
 
 
 def select_k(X: np.ndarray, k_range: tuple[int, ...], rng: np.random.Generator
@@ -234,7 +477,42 @@ def select_k(X: np.ndarray, k_range: tuple[int, ...], rng: np.random.Generator
         per k in order; best_k = the k with the smallest BIC (ties -> the
         smaller k).
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # input: X, k_range, rng
+    # output: (bic_values, best_k)
+
+    N, d = X.shape
+    bic_values = []
+
+    # For each k in k_range:
+    for k in k_range:
+        # 1. means, covs, weights, resp, lls = gmm_em(X, k, rng)  # defaults
+        means, covs, weights, resp, lls = gmm_em(X, k, rng)
+
+        # 2. ll = lls[-1]
+        ll = lls[-1]
+
+        # 3. Free-parameter count of a d-dimensional, k-component
+        #     full-covariance GMM:
+        #         n_params = k * d              (means)
+        #                 + k * d * (d + 1) // 2   (symmetric covariances)
+        #                 + (k - 1)           (weights sum to 1)
+        n_params = k * d + k * d * (d + 1) // 2 + (k - 1)
+        
+        # 4. bic_k = bic(ll, n_params, n)
+        bic_k = bic(ll, n_params, N)
+        bic_values.append(bic_k)
+
+    # Returns:
+    # (bic_values, best_k): bic_values = list of plain Python floats, one
+    # per k in order; best_k = the k with the smallest BIC (ties -> the
+    # smaller k).
+    best_idx = np.argmin(bic_values)
+    best_k = int(k_range[best_idx])
+
+    return bic_values, best_k
+
 # ============================ END TODO (Task 3) ==============================
 
 
@@ -271,7 +549,71 @@ def run_experiment(data: dict, rng: np.random.Generator) -> dict:
          "ll_first": float, "ll_final": float, "ll_min_delta": float,
          "bic_k2": float, ..., "bic_k8": float, "best_k": int}
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # input: data, rng
+    # output: 여러 개..
+
+    X = data["X"]
+    labels = data["labels"]
+             
+
+    # Steps (in this order, all with K_OBJECTS / K_RANGE / defaults):
+    # 1. centers, km_labels, inertia = kmeans(X, K_OBJECTS, rng)
+    centers, km_labels, inertia = kmeans(X, K_OBJECTS, rng)
+
+    # 2. means, covs, weights, resp, lls = gmm_em(X, K_OBJECTS, rng)
+    #     gmm_labels = resp.argmax(axis=1)
+    means, covs, weights, resp, lls = gmm_em(X, K_OBJECTS, rng)
+    gmm_labels = resp.argmax(axis=1)
+
+    # 3. ari_kmeans = adjusted_rand_index(labels, km_labels)
+    #     ari_gmm    = adjusted_rand_index(labels, gmm_labels)
+    ari_kmeans = adjusted_rand_index(labels, km_labels)
+    ari_gmm    = adjusted_rand_index(labels, gmm_labels)
+
+    # 4. EM sanity: ll_first = lls[0], ll_final = lls[-1],
+    #     ll_min_delta = min over consecutive pairs of (lls[t+1] - lls[t])
+    #     (an exact M-step never decreases the likelihood; the reg*I term
+    #     makes the M-step slightly non-optimal, so tiny negative values
+    #     on the order of -1e-8 are normal).
+    ll_first = lls[0]
+    ll_final = lls[-1]
+    ll_deltas = np.diff(lls)
+    ll_min_delta = np.min(ll_deltas)
+
+
+    # 5. bic_values, best_k = select_k(X, K_RANGE, rng)
+    bic_values, best_k = select_k(X, K_RANGE, rng)
+
+    # Returns dict (plain Python ints/floats; floats rounded to 4 decimals
+    # except ll_min_delta, rounded to 9):
+    #     {"n_points": int, "kmeans_inertia": float,
+    #      "ari_kmeans": float, "ari_gmm": float,
+    #      "ll_first": float, "ll_final": float, "ll_min_delta": float,
+    #      "bic_k2": float, ..., "bic_k8": float, "best_k": int}
+
+    metrics = {
+        "n_points": int(X.shape[0]),
+
+        "kmeans_inertia": round(float(inertia), 4),
+
+        "ari_kmeans": round(float(ari_kmeans), 4),
+        "ari_gmm": round(float(ari_gmm), 4),
+
+        "ll_first": round(float(ll_first), 4),
+        "ll_final": round(float(ll_final), 4),
+
+        "ll_min_delta": round(float(ll_min_delta), 9),
+    }
+
+    for k, bic_value in zip(K_RANGE, bic_values):
+            metrics[f"bic_k{k}"] = round(float(bic_value), 4)
+
+    metrics["best_k"] = int(best_k)
+
+    return metrics
+
 # ============================ END TODO (Task 4) ==============================
 
 
