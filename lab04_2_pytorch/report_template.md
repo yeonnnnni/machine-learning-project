@@ -1,71 +1,61 @@
-> Fill in this template, then export to **report.pdf** for submission
-> (e.g., VS Code/Typora export, or `pandoc report.md -o report.pdf`).
->
-> **Budget**: 0.5–1 page of text **plus** Figures 1–3, ≤ 3 pages total. Text-based PDF, not a scan.
->
-> **Caption format is the same as the concept note**: number, a short title, then one or two
-> sentences of explanation. Table captions go **above** the table, figure captions **below** the
-> figure. Every figure and table must be referred to by number somewhere in your text — an
-> unreferenced figure earns nothing.
->
-> Delete these instruction lines before exporting.
-
-# Lab 4-2 Report — {Student ID} {Name}
+# Lab 4-2 Report — 20231879 LeeJeongyeon
 
 ## 1. What I did
 
-(2–3 sentences. Only what is not obvious from the skeleton.)
+I followed the provided skeleton without changing the model architecture, function interfaces, or fixed experiment settings. I retained each trained model alongside its grid record, allowing `run_experiment` to evaluate the selected model directly after the search.
 
 ## 2. Results
 
-**Table 1. Six configurations scored on validation, one of them scored on test.** (One sentence:
-say which row was selected and on which number, before the reader compares the columns.)
+**Table 1. Six configurations scored on validation, one of them scored on test.** The configuration with hidden size 32 and learning rate 0.1 was selected because it had the lowest validation loss, 0.335632.
 
 | Hidden size | Learning rate | Best epoch | Epochs run | Validation loss | Validation accuracy |
 |-------------|---------------|------------|------------|-----------------|---------------------|
-| 8 | 0.01 |  |  |  |  |
-| 8 | 0.1 |  |  |  |  |
-| 8 | 1.0 |  |  |  |  |
-| 32 | 0.01 |  |  |  |  |
-| 32 | 0.1 |  |  |  |  |
-| 32 | 1.0 |  |  |  |  |
+| 8 | 0.01 | 80 | 80 | 0.600035 | 0.700000 |
+| 8 | 0.1 | 52 | 62 | 0.352824 | 0.867500 |
+| 8 | 1.0 | 15 | 25 | 0.362131 | 0.850000 |
+| 32 | 0.01 | 80 | 80 | 0.592339 | 0.700000 |
+| 32 | 0.1 | 43 | 53 | 0.335632 | 0.855000 |
+| 32 | 1.0 | 20 | 30 | 0.354082 | 0.870000 |
 
-Selected configuration: hidden size ____, learning rate ____.
-Test loss ____, test accuracy ____ (measured once, after the table above was complete).
+Selected configuration: hidden size 32, learning rate 0.1.
+Test loss 0.370398, test accuracy 0.847500, measured once after the grid search was complete.
 
 ## 3. Figures
 
-(Export from `notebooks/lab04_2_visualization.ipynb` and paste the images here. Axis labels must be
-legible.)
+<p align="center">
+  <img src="notebooks/fig1.png" width="50%" alt="Figure 1. Training and validation loss of the selected configuration.">
+</p>
 
-{image}
+**Figure 1. Training and validation loss of the selected configuration.** After about epoch 30, training loss continues to decrease while validation loss levels off and fluctuates. Early stopping ended training at epoch 53 and restored the weights from epoch 43, where validation loss was lowest at 0.335632.
 
-**Figure 1. Training and validation loss of the selected configuration.** (One or two sentences:
-where the two curves separate, and which epoch early stopping kept.)
+<p align="center">
+  <img src="notebooks/fig2.png" width="50%" alt="Figure 2. Validation loss across the grid.">
+</p>
 
-{image}
+**Figure 2. Validation loss across the grid.** Changing the learning rate from 0.01 to 0.1 reduced validation loss by 0.247211 for hidden size 8 and 0.256707 for hidden size 32. Increasing hidden size from 8 to 32 reduced loss by only 0.007696–0.017192 across the three learning rates, so learning rate had the larger effect.
 
-**Figure 2. Validation loss across the grid.** (One or two sentences: which factor moves the loss
-more, the learning rate or the hidden size, and by how much.)
+<p align="center">
+  <img src="notebooks/fig3.png" width="50%" alt="Figure 3. Validation against test for the selected configuration.">
+</p>
 
-{image}
-
-**Figure 3. Validation against test for the selected configuration.** (One or two sentences: the
-size and the direction of the gap.)
+**Figure 3. Validation against test for the selected configuration.** Test loss was 0.034766 higher than validation loss, while test accuracy was 0.007500 lower, a gap of 0.75 percentage points.
 
 ## 4. Interpretation
 
-(Refer to figures and the table by number. Two rows of your table should land at exactly the
-accuracy of a model that never predicts a service call: which rows are they, what is that number
-on your validation split, and what does a learning rate have to do with it? In Figure 1, what
-would have happened to the validation loss if training had run to the full epoch budget? Explain
-what selecting on validation loss, rather than on validation accuracy, gains you here.
-Why is the test number in Figure 3 worse than the validation number for the very same weights?)
+In Table 1, the configurations with hidden sizes 8 and 32 at learning rate 0.01 both achieve validation accuracy 0.700000, matching a model that always predicts `needs_service = 0`. Their best epochs are both 80, suggesting that the small SGD parameter updates make insufficient progress within the epoch budget to improve accuracy beyond the majority-class baseline.
+
+Figure 1 shows that training loss continues to decrease after about epoch 30 while validation loss fluctuates near its minimum. Continuing to epoch 80 could have produced further fluctuation or increased validation loss as the model fitted training-specific noise, but epochs 54–80 were not run, so their exact losses are unknown.
+
+As shown in Table 1 and Figure 2, hidden size 32 and learning rate 0.1 were selected by validation loss 0.335632, although hidden size 32 and learning rate 1.0 had higher validation accuracy, 0.870000, with a worse loss of 0.354082. `BCEWithLogitsLoss` also reflects prediction confidence and penalizes confident errors, while accuracy only counts correct predictions after comparing logits with zero.
+
+In Figure 3, the same weights are evaluated on different sets of 400 samples, so loss and accuracy can differ through sampling variation. Validation also determined the best epoch and configuration, which can make its score optimistic and help explain the slightly worse test result.
 
 ## 5. Limitations
 
-(One concrete thing that would change your conclusions — for example, the best hidden size sitting
-at the edge of the grid, or a single validation split rather than cross-validation.)
+The six configurations were compared on one validation split with seed 42.
+Its 400 samples determined both the best epoch and the selected configuration.
+A different split could change the ranking in Table 1 and the validation–test gap.
+Repeated splits or cross-validation would help check whether hidden size 32 and learning rate 0.1 remain the best choice.
 
 ## AI & external-code usage
 
@@ -73,4 +63,4 @@ at the edge of the grid, or a single validation split rather than cross-validati
 
 | Tool / Source | Part used for | What I modified & verified myself |
 |---------------|---------------|-----------------------------------|
-|  |  |  |
+| ChatGPT | Explanation of NumPy, and Matplotlib syntax needed for the TODOs and plots; debugging syntax errors; interpretation of the report requirements; English rewriting of report sentences that I first wrote in Korean; and help drafting the submission README. | I read each TODO and developed the implementation logic myself, then implemented the code using the syntax explanations. I reviewed and modified the code after debugging, checked the generated outputs and plots, wrote the report content in Korean before asking ChatGPT to refine it in English, and reviewed the final README before submission. |

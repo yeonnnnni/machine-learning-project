@@ -1,0 +1,70 @@
+{
+  "lab": "lab04_2",
+  "student_id": "20231879",
+  "name": "LeeJeongyeon",
+  "seed": 42,
+  "metrics": {
+    "n_train": 1200,
+    "n_val": 400,
+    "n_test": 400,
+    "positive_rate": 0.299,
+    "n_configs": 6,
+    "best_hidden_size": 32,
+    "best_lr": 0.1,
+    "val_loss": 0.335632,
+    "val_accuracy": 0.855,
+    "test_loss": 0.370398,
+    "test_accuracy": 0.8475,
+    "grid": [
+      {
+        "hidden_size": 8,
+        "lr": 0.01,
+        "val_loss": 0.600035,
+        "val_accuracy": 0.7,
+        "best_epoch": 80,
+        "epochs_run": 80
+      },
+      {
+        "hidden_size": 8,
+        "lr": 0.1,
+        "val_loss": 0.352824,
+        "val_accuracy": 0.8675,
+        "best_epoch": 52,
+        "epochs_run": 62
+      },
+      {
+        "hidden_size": 8,
+        "lr": 1.0,
+        "val_loss": 0.362131,
+        "val_accuracy": 0.85,
+        "best_epoch": 15,
+        "epochs_run": 25
+      },
+      {
+        "hidden_size": 32,
+        "lr": 0.01,
+        "val_loss": 0.592339,
+        "val_accuracy": 0.7,
+        "best_epoch": 80,
+        "epochs_run": 80
+      },
+      {
+        "hidden_size": 32,
+        "lr": 0.1,
+        "val_loss": 0.335632,
+        "val_accuracy": 0.855,
+        "best_epoch": 43,
+        "epochs_run": 53
+      },
+      {
+        "hidden_size": 32,
+        "lr": 1.0,
+        "val_loss": 0.354082,
+        "val_accuracy": 0.87,
+        "best_epoch": 20,
+        "epochs_run": 30
+      }
+    ]
+  },
+  "runtime_seconds": 5.34
+}
