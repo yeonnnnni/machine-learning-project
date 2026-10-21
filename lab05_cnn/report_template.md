@@ -1,70 +1,56 @@
-> Fill in this template, then export to **report.pdf** for submission
-> (e.g., VS Code/Typora export, or `pandoc report.md -o report.pdf`).
->
-> **Budget**: 0.5–1 page of text **plus** Figures 1–3, ≤ 3 pages total. Text-based PDF, not a scan.
->
-> **Caption format is the same as the concept note**: number, a short title, then one or two
-> sentences of explanation. Table captions go **above** the table, figure captions **below** the
-> figure. Every figure and table must be referred to by number somewhere in your text — an
-> unreferenced figure earns nothing.
->
-> Delete these instruction lines before exporting.
-
-# Lab 5 Report — {Student ID} {Name}
+# Lab 5 Report — 20231879 LeeJeongyeon
 
 ## 1. What I did
 
-(2–3 sentences. Only what is not obvious from the skeleton.)
+I followed the provided skeleton without changing the architecture, function interfaces, or fixed training settings. For the transfer model, I loaded only the pretrained 'features.*' weights and retained the freshly initialized four-class head.
 
 ## 2. Results
 
-**Table 1. Both models under one split, one seed, one training budget.** (One sentence: the
-baseline row is what the other two have to beat, and the parameter column is the second axis of
-the comparison, so say what the table is meant to show before the numbers.)
+**Table 1. Both models under one split, one seed, one training budget.** Table 1 compares validation accuracy against the majority-class baseline and the number of trainable parameters, using 240 labelled training images and seed 42.
 
 | Model | Validation accuracy | Trainable parameters |
 |-------|---------------------|----------------------|
-| baseline (most frequent class) |  | 0 |
-| CNN from scratch |  |  |
-| frozen backbone + new head |  |  |
+| baseline (most frequent class) | 0.2573 | 0 |
+| CNN from scratch | 0.8219 | 7,940 |
+| frozen backbone + new head | 0.9469 | 2,052 |
 
 ## 3. Figures
 
-(Export from `notebooks/lab05_visualization.ipynb` and paste the images here. Axis labels must be
-legible.)
+<p align="center">
+  <img src="notebooks/fig1_samples.png" width="80%" alt="Figure 1. Sample images, one row per class.">
+</p>
 
-{image}
 
-**Figure 1. Sample images, one row per class.** (One or two sentences: what varies between images
-of the same class, and which two classes you would expect the model to confuse.)
+**Figure 1. Sample images, one row per class.** Samples within each class vary in position, size, orientation, and pixel noise. Some diamond and ellipse samples have similar filled shapes with noisy boundaries, suggesting that these classes could be confused.
 
-{image}
+<p align="center">
+  <img src="notebooks/fig2_label_budget.png" width="80%" alt="Figure 2. Accuracy against the label budget.">
+</p>
 
-**Figure 2. Accuracy against the label budget.** (One or two sentences: how the two curves move
-as labels are added, and where they would meet.)
+**Figure 2. Accuracy against the label budget.** As the label budget increases from 60 to 900, scratch accuracy rises from 0.4377 to 0.9667 and transfer accuracy from 0.7439 to 0.9800. The gap narrows from 30.62 to 1.33 percentage points, but the curves do not meet within the measured range.
 
-{image}
+<p align="center">
+  <img src="notebooks/fig3_confusion.png" width="80%" alt="Figure 3. Confusion matrices, scratch against transfer.">
+</p>
 
-**Figure 3. Confusion matrices, scratch against transfer.** (One or two sentences: which pair of
-classes carries most of the errors, and whether Figure 1 explains it.)
+**Figure 3. Confusion matrices, scratch against transfer.** The combined errors between diamond and ellipse decrease from 107 for scratch to 19 for transfer, remaining the largest confusion pair in both models. This confusion is consistent with the visually similar noisy shapes in Figure 1.
 
 ## 4. Interpretation
 
-(Refer to the figures and the table by number. What fraction of the weights does the transfer
-model update, and how does its accuracy compare with the scratch model's? Explain the difference.
-What accuracy does the baseline reach, and what does that number say about the classes? Where in
-the network does the gradient stop for the transfer model, and what would change if you unfroze
-the backbone? Which classes does Figure 3 say are hard, and does Figure 1 explain that?)
+Table 1 shows that the transfer model updates 2,052 of 7,940 parameters, or 25.84%, while achieving validation accuracy 12.50 percentage points higher than scratch. It reuses a backbone pretrained on 9,000 images of six other shape classes, whereas scratch learns both the backbone and head from the 240 labelled training images. Reusing pretrained features allows the transfer model to learn only a new classification head from the limited labelled data, instead of learning the feature extractor from scratch.
+
+The majority-class baseline predicts ell and reaches 0.2573 accuracy, close to one quarter. This is consistent with the roughly balanced distribution of the four classes.
+
+In the transfer model, features parameters have 'requires_grad=False' and are excluded from the optimizer. Backpropagation stops at the boundary between the head and frozen backbone, so only head is updated. Unfreezing the backbone and including its parameters in the optimizer would allow all 7,940 parameters to be fine-tuned; the resulting accuracy was not measured.
+
+Figure 3 shows that diamond and ellipse remain a difficult pair after transfer, although their combined errors decrease substantially. Their similar appearances under pixel noise in Figure 1 provide a possible explanation for this confusion.
 
 ## 5. Limitations
 
-(One concrete thing that would change your conclusions. Figure 2 hands you one: say what the gap
-does as labels are added, and what that implies about when transfer learning is worth using.)
+The advantage observed with 240 labels does not remain constant as more labels are added: Figure 2 shows a gap of 30.62 percentage points at 60 labels and 1.33 points at 900 labels. Transfer therefore provides a larger accuracy benefit when labels are scarce in this experiment. However, the validation set also changes with each budget, so a fixed held-out set would be needed to compare the label budgets on the same evaluation data.
 
 ## AI & external-code usage
 
-(Required. Leave the table empty only if you used nothing — see README §6.)
-
 | Tool / Source | Part used for | What I modified & verified myself |
 |---------------|---------------|-----------------------------------|
-|  |  |  |
+| ChatGPT | Explanation of NumPy, and Matplotlib syntax needed for the TODOs and plots; debugging syntax errors; interpretation of the report requirements; English rewriting of report sentences that I first wrote in Korean; and help drafting the submission README. | I read each TODO and developed the implementation logic myself, then implemented the code using the syntax explanations. I reviewed and modified the code after debugging, checked the generated outputs and plots, wrote the report content in Korean before asking ChatGPT to refine it in English, and reviewed the final README before submission. |

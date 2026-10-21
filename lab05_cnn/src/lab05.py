@@ -17,8 +17,8 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 
 # ---- Fill in your information (used in results.json) ----
-STUDENT_ID = "00000000"   # TODO: your student id
-STUDENT_NAME = "None"     # TODO: your name in Korean or roman letters — "홍길동" / "HongGildong"
+STUDENT_ID = "20231879"   # TODO: your student id
+STUDENT_NAME = "LeeJeongyeon"     # TODO: your name in Korean or roman letters — "홍길동" / "HongGildong"
 
 SEED = 42  # fixed for the whole course — DO NOT CHANGE
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -138,7 +138,14 @@ def conv_output_shape(h: int, w: int, kernel_size: int, stride: int = 1,
     Returns:
         (out_h, out_w) as a tuple of two plain Python ints.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 출력 높이 계산
+    out_h = (h + 2 * padding - kernel_size) // stride + 1
+    # 출력 너비 계산
+    out_w = (w + 2 * padding - kernel_size) // stride + 1
+
+    return out_h, out_w
 # ============================ END TODO (Task 1) ==============================
 
 
@@ -173,15 +180,46 @@ class SmallCNN(nn.Module):
 
     def __init__(self, n_classes: int = N_CLASSES) -> None:
         super().__init__()
-        raise NotImplementedError
+        # raise NotImplementedError
+        # 특징 추출부를 지정된 9개 레이어로 생성
+        self.features = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+
+        # 분류용 head 생성
+        self.head = nn.Linear(FEATURE_DIM, n_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError
+        # raise NotImplementedError
+        
+        # 이미지에서 특징 추출
+        x = self.features(x)
 
+        # 배치 차원은 유지하면서 나머지 차원 펼치기
+        x = torch.flatten(x, start_dim=1)
+
+        # 분류 점수 계산 후 반환
+        logits = self.head(x)
+        return logits
 
 def build_cnn(n_classes: int = N_CLASSES) -> SmallCNN:
     """Return an untrained SmallCNN with every parameter trainable."""
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 전달받은 클래스 수로 학습 전 모델 생성
+    model = SmallCNN(n_classes=n_classes)
+
+    return model
 # ============================ END TODO (Task 2) ==============================
 
 
@@ -192,8 +230,13 @@ def freeze_backbone(model: SmallCNN) -> SmallCNN:
     model.head is left alone and stays trainable. Returns the same model object
     (modified in place), so that `model = freeze_backbone(model)` also works.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
 
+    # 특징 추출부의 모든 파라미터를 동결
+    for param in model.features.parameters():
+        param.requires_grad = False
+
+    return model
 
 def build_transfer_model(n_classes: int = N_CLASSES,
                          weights_path: str | Path = WEIGHTS_PATH) -> SmallCNN:
@@ -219,7 +262,25 @@ def build_transfer_model(n_classes: int = N_CLASSES,
     number of parameters in the head, and make_optimizer(model) must see only the
     head parameters.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 사전학습 state_dict를 CPU로 읽기
+    state = torch.load(weights_path, map_location="cpu")
+
+    # 목표 클래스 수에 맞는 새 모델 생성
+    model = build_cnn(n_classes)
+
+    # checkpoint에서 backbone 가중치만 추출
+    backbone = {k[len("features."):]: v for k, v in state.items() if k.startswith("features.")}
+
+    # 추출한 가중치를 특징 추출부에 적용
+    model.features.load_state_dict(backbone)
+
+    # 특징 추출부 동결
+    freeze_backbone(model)
+
+    return model
+
 # ============================ END TODO (Task 3) ==============================
 
 
@@ -255,7 +316,55 @@ def run_experiment(X: torch.Tensor, y: torch.Tensor) -> dict:
          "scratch":  {"accuracy": float, "trainable_params": int},
          "transfer": {"accuracy": float, "trainable_params": int}}
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 데이터를 한 번 분할
+    X_train, X_val, y_train, y_val = split_data(X, y)
+
+    # 결과를 담을 딕셔너리 생성
+    results = {}
+
+    # 훈련 데이터에서 최빈 클래스 찾기
+    class_counts = torch.bincount(y_train)
+    majority_class = torch.argmax(class_counts)
+
+    # baseline 예측과 결과 저장
+    baseline_pred = torch.full_like(y_val, majority_class)
+    results["baseline"] = {
+        "accuracy": accuracy(y_val, baseline_pred),
+        "trainable_params": 0
+    }
+
+    # scratch 모델 생성 및 학습
+    set_seed()
+    scratch_model = build_cnn(N_CLASSES)
+    train_model(scratch_model, X_train, y_train)
+    scratch_pred = predict(scratch_model, X_val)
+    results["scratch"] = {
+        "accuracy": accuracy(y_val, scratch_pred),
+        "trainable_params": count_trainable(scratch_model)
+    }
+
+    # transfer 모델 생성 및 학습
+    set_seed()
+    transfer_model = build_transfer_model(N_CLASSES, WEIGHTS_PATH)
+    train_model(transfer_model, X_train, y_train)
+    transfer_pred = predict(transfer_model, X_val)
+    results["transfer"] = {
+        "accuracy": accuracy(y_val, transfer_pred),
+        "trainable_params": count_trainable(transfer_model)
+    }
+
+    # transfer 모델 평가 및 결과 저장
+    transfer_accuracy = accuracy(y_val, transfer_pred)
+    transfer_trainable_params = count_trainable(transfer_model)
+    results["transfer"] = {
+        "accuracy": transfer_accuracy,
+        "trainable_params": transfer_trainable_params
+    }
+
+    return results
+
 # ============================ END TODO (Task 4) ==============================
 
 
