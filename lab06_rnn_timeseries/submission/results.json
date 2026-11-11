@@ -1,0 +1,25 @@
+{
+  "lab": "lab06",
+  "student_id": "20231879",
+  "name": "LeeJeongyeon",
+  "seed": 42,
+  "metrics": {
+    "n_points": 1095,
+    "window": 14,
+    "horizon": 1,
+    "gap": 7,
+    "n_train": 739,
+    "n_val": 150,
+    "n_test": 150,
+    "scale_mean": 170.4754,
+    "scale_std": 25.5496,
+    "naive_scale": 16.2314,
+    "persistence_mae": 15.5067,
+    "persistence_rmse": 20.0934,
+    "persistence_mase": 0.9554,
+    "rnn_mae": 9.2924,
+    "rnn_rmse": 11.667,
+    "rnn_mase": 0.5725
+  },
+  "runtime_seconds": 7.22
+}

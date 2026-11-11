@@ -1,70 +1,57 @@
-> Fill in this template, then export to **report.pdf** for submission
-> (e.g., VS Code/Typora export, or `pandoc report.md -o report.pdf`).
->
-> **Budget**: 0.5–1 page of text **plus** Figures 1–3, ≤ 3 pages total. Text-based PDF, not a scan.
->
-> **Caption format is the same as the concept note**: number, a short title, then one or two
-> sentences of explanation. Table captions go **above** the table, figure captions **below** the
-> figure. Every figure and table must be referred to by number somewhere in your text — an
-> unreferenced figure earns nothing.
->
-> Delete these instruction lines before exporting.
-
-# Lab 6 Report — {Student ID} {Name}
+# Lab 6 Report — 20231879 LeeJeongyeon
 
 ## 1. What I did
 
-(2–3 sentences. Only what is not obvious from the skeleton.)
+I followed the provided skeleton without changing the function interfaces, fixed experiment settings, or supplied training loop. Windows were constructed separately within each chronological segment, and the standardisation constants and naive_scale were computed from the training segment only.
 
 ## 2. Results
 
-**Table 1. Both forecasters on the same test windows, one split, one seed.** (One sentence: the
-persistence row is what the RNN has to beat, so say what it tells you before reading the rest.)
+**Table 1. Both forecasters on the same test windows, one split, one seed.** The persistence baseline achieves a test MASE of 0.9554, which the GRU must improve on to outperform repeating yesterday's sales.
 
 | Forecaster | MAE (cups) | RMSE (cups) | MASE |
 |------------|------------|-------------|------|
-| persistence (yesterday) |  |  |  |
-| GRU (window 14) |  |  |  |
+| persistence (yesterday) | 15.5067 | 20.0934 | 0.9554 |
+| GRU (window 14) | 9.2924 | 11.667 | 0.5725 |
 
-Split sizes (windows): train ___ / validation ___ / test ___.
-Scaling constants, from the training segment only: mean ___ , std ___ .
+Split sizes (windows): train 739 / validation 150 / test 150.
+Scaling constants, from the training segment only: mean 170.4754 , std 25.5496 .
 
 ## 3. Figures
 
-(Export from `notebooks/lab06_visualization.ipynb` and paste the images here. Axis labels must be
-legible.)
+<p align="center">
+  <img src="notebooks/fig1.png" width="80%" alt="Figure 1. The series and the chronological split.">
+</p>
 
-{image}
+**Figure 1. The series and the chronological split.** Training occupies days 0–752, validation days 760–923, and test days 931–1094, using zero-based day indices. The two white strips mark seven-day embargo gaps excluded between consecutive segments.
 
-**Figure 1. The series and the chronological split.** (One or two sentences: where the three
-segments sit, and what the two white strips between them are for.)
+<p align="center">
+  <img src="notebooks/fig2.png" width="80%" alt="Figure 2. Actual, persistence and RNN forecasts over the last 60 test days.">
+</p>
 
-{image}
+**Figure 2. Actual, persistence and RNN forecasts over the last 60 test days.** Persistence has its largest errors at sharp changes, including the Monday increases at days 1036 and 1085 and the Saturday decrease at day 1048. These days coincide with transitions between weekday and weekend sales levels.
 
-**Figure 2. Actual, persistence and RNN forecasts over the last 60 test days.** (One or two
-sentences: where the persistence line is furthest from the truth, and whether those days have
-anything in common.)
+<p align="center">
+  <img src="notebooks/fig3.png" width="80%" alt="Figure 3. Test error for the two forecasters.">
+</p>
 
-{image}
-
-**Figure 3. Test error for the two forecasters.** (One or two sentences: what the MASE bars say
-that the MAE bars do not.)
+**Figure 3. Test error for the two forecasters.** MAE measures error in cups, whereas MASE expresses it relative to the training segment's mean absolute one-step change. Both MASE values are below 1, and the GRU has lower MAE, RMSE, and MASE than persistence.
 
 ## 4. Interpretation
 
-(Refer to the figures and Table 1 by number. Why is persistence already this good on this series?
-Which days does it get wrong, and what does the RNN use to do better there — you can see it in
-Figure 2. Why is MASE the number to quote when someone asks whether your MAE in cups is good? What
-would have happened to all three numbers if you had shuffled the days before splitting?)
+Table 1 shows that persistence achieves a test MASE of 0.9554. Repeating the most recent observation retains the current sales level, which is useful when sales change little from one day to the next. However, Figure 2 shows that this forecast follows sharp changes one day late, producing large errors at weekend decreases and Monday increases.
+
+The GRU receives 14 consecutive cups values, covering two weekly cycles, and uses the last hidden state for prediction. It does not receive an explicit weekday feature. In Figure 2, its forecasts follow several recurring decreases and recoveries more closely than persistence, although some sharp peaks remain underestimated. Table 1 records a lower test MAE of 9.2924 cups for the GRU, compared with 15.5067 cups for persistence.
+
+Figure 3 provides a scale-relative interpretation of these errors. The naive_scale is 16.2314 cups, computed from consecutive observations in the training segment only. The GRU's MASE of 0.5725 means that its test MAE is approximately 57.25% of this reference movement. Persistence need not have a test MASE of exactly 1 because its test error and the training reference are computed over different periods.
+
+Figure 1 preserves the order in which observations become available. Shuffling before splitting could place later observations in training while earlier observations are evaluated, causing future information to enter the comparison. MAE, RMSE, and MASE could consequently become artificially low; no shuffled experiment was performed to measure this effect.
 
 ## 5. Limitations
 
-(One concrete thing that would change your conclusions, and why.)
+The comparison uses one chronological split with seed 42. Figure 1 shows that the sales level changes over time, so a different test period could change both forecasters' errors and the size of the GRU's advantage. Walk-forward validation would be needed to check whether the improvement persists across multiple chronological test periods.
 
 ## AI & external-code usage
 
-(Required. Leave the table empty only if you used nothing — see README §6.)
-
 | Tool / Source | Part used for | What I modified & verified myself |
 |---------------|---------------|-----------------------------------|
-|  |  |  |
+| ChatGPT | Explanation of NumPy, and Matplotlib syntax needed for the TODOs and plots; debugging syntax errors; interpretation of the report requirements; English rewriting of report sentences that I first wrote in Korean; and help drafting the submission README. | I read each TODO and developed the implementation logic myself, then implemented the code using the syntax explanations. I reviewed and modified the code after debugging, checked the generated outputs and plots, wrote the report content in Korean before asking ChatGPT to refine it in English, and reviewed the final README before submission. |

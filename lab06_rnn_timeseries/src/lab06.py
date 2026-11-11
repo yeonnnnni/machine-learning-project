@@ -18,8 +18,8 @@ import torch
 from torch import nn
 
 # ---- Fill in your information (used in results.json) ----
-STUDENT_ID = "00000000"   # TODO: your student id
-STUDENT_NAME = "None"     # TODO: your name in Korean or roman letters — "홍길동" / "HongGildong"
+STUDENT_ID = "20231879"   # TODO: your student id
+STUDENT_NAME = "LeeJeongyeon"     # TODO: your name in Korean or roman letters — "홍길동" / "HongGildong"
 
 SEED = 42  # fixed for the whole course — DO NOT CHANGE
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "cafe_daily.csv"
@@ -78,7 +78,32 @@ def make_windows(series: np.ndarray, window: int = WINDOW,
         both float64. If N < window + horizon, return two empty arrays with
         shapes (0, window) and (0,).
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 1. 입력 시계열을 float64 numpy 배열로 변환
+    series = np.asarray(series, dtype=np.float64)
+    N = len(series)
+
+    # 2. 생성 가능한 입력-정답 쌍의 개수 계산
+    n_pairs = N - window - horizon + 1
+
+    # 3. 데이터 부족 시 지정된 shape의 빈 배열 반환
+    if n_pairs <= 0:
+        return np.empty((0, window), dtype=np.float64), np.empty((0,), dtype=np.float64)
+
+    # 4. 입력 윈도와 정답을 저장할 float64 배열 생성
+    X = np.empty((n_pairs, window), dtype=np.float64)
+    y = np.empty((n_pairs,), dtype=np.float64)
+
+    # 5. 시작 위치를 하루씩 이동하며 입력 윈도와 미래 정답 저장
+    for i in range(n_pairs):
+        X[i] = series[i:i + window]  # 입력 윈도
+        y[i] = series[i + window + horizon - 1]  # 미래 정답
+
+    # 6. 입력 배열 X와 정답 배열 y 반환
+    return X, y
+
+
 # ============================ END TODO (Task 1) ==============================
 
 
@@ -112,7 +137,33 @@ def temporal_split(n: int, val_frac: float = VAL_FRAC, test_frac: float = TEST_F
         (train_idx, val_idx, test_idx), each a 1-D numpy array of ints in
         increasing order.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 1. test와 validation의 날짜 수를 반올림하여 계산
+    n_test = int(round(test_frac * n))
+    n_val = int(round(val_frac * n))
+
+    # 2. 두 구간과 두 gap을 제외한 train 날짜 수 계산
+    n_train = n - n_val - n_test - 2 * gap
+
+    # 3. train 데이터가 남지 않는 경우 ValueError 발생
+    if n_train <= 0:
+        raise ValueError("n_train <= 0")
+
+    # 4. 처음부터 train 종료 지점까지의 정수 인덱스 생성
+    train_idx = np.arange(n_train)
+
+    # 5. 첫 번째 gap 이후 validation 정수 인덱스 생성
+    val_start = n_train + gap
+    val_idx = np.arange(val_start, val_start + n_val)
+
+    # 6. 두 번째 gap 이후 test 정수 인덱스 생성
+    test_start = val_start + n_val + gap
+    test_idx = np.arange(test_start, n)
+
+    # 7. 시간순 train, validation, test 인덱스 배열 반환
+    return train_idx, val_idx, test_idx
+
 # ============================ END TODO (Task 2) ==============================
 
 
@@ -141,17 +192,39 @@ class ForecastRNN(nn.Module):
                  num_layers: int = 1) -> None:
         super().__init__()
         # TODO: create self.rnn and self.head with the names above.
-        raise NotImplementedError
+        # raise NotImplementedError
+        # 1. 부모 클래스 초기화 유지
+        super().__init__()
+
+        # 2. 지정된 크기와 batch_first=True 설정으로 self.rnn 생성
+        self.rnn = nn.GRU(input_size=input_size, hidden_size=hidden_size,
+                          num_layers=num_layers, batch_first=True)
+
+        # 3. hidden_size를 출력값 하나로 변환하는 self.head 생성
+        self.head = nn.Linear(hidden_size, 1)
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # TODO: (batch, seq_len, input_size) -> (batch, 1)
-        raise NotImplementedError
+        # raise NotImplementedError
+
+        # 4. 입력 시퀀스를 GRU에 전달하여 전체 시점의 출력 획득
+        out, _ = self.rnn(x)
+
+        # 5. 모든 배치에서 마지막 시간 위치의 hidden state 선택
+        last_hidden = out[:, -1, :]
+
+        # 6. 선택한 hidden state를 head에 전달하여 예측값 반환
+        return self.head(last_hidden)
 
 
 def build_rnn(input_size: int = 1, hidden_size: int = HIDDEN_SIZE,
               num_layers: int = 1) -> ForecastRNN:
     """Return an UNTRAINED ForecastRNN with the given sizes."""
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 7. 전달받은 크기로 미학습 ForecastRNN 모델 생성 및 반환
+    return ForecastRNN(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers)
 # ============================ END TODO (Task 3) ==============================
 
 
@@ -270,7 +343,62 @@ def run_experiment(series: np.ndarray) -> dict:
         scale_mean, scale_std and naive_scale are rounded to 4 decimals
         (the metric dicts are already rounded by compute_metrics).
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 1. 함수 시작 시 난수 시드 초기화
+    set_seed()
+
+    # 2. 원본 시계열의 날짜 인덱스를 시간순으로 분할
+    train_idx, val_idx, test_idx = temporal_split(len(series))
+
+    # 3. 원본 단위의 train, validation, test 구간 추출
+    train_segment = series[train_idx]
+    val_segment = series[val_idx]
+    test_segment = series[test_idx]
+
+    # 4. 원본 train 구간에서만 평균과 모집단 표준편차 계산
+    scale_mean = np.mean(train_segment)
+    scale_std = np.std(train_segment, ddof=0)
+
+    # 5. train의 평균과 표준편차로 세 구간 표준화
+    train_standardized = (train_segment - scale_mean) / scale_std
+    val_standardized = (val_segment - scale_mean) / scale_std
+    test_standardized = (test_segment - scale_mean) / scale_std
+
+    # 6. 각 구간에서 별도로 입력 윈도와 정답 생성
+    X_train, y_train = make_windows(train_standardized, WINDOW, HORIZON)
+    X_val, y_val = make_windows(val_standardized, WINDOW, HORIZON)
+    X_test, y_test = make_windows(test_standardized, WINDOW, HORIZON)
+
+    # 7. GRU 모델 생성 및 제공된 학습 함수로 학습
+    model = build_rnn()
+    model, _ = train_model(model, X_train, y_train, X_val, y_val)
+
+    # 8. GRU 예측값과 test 정답을 원래 cups 단위로 복원
+    pred_rnn = predict(model, X_test) * scale_std + scale_mean
+    y_test_cups = y_test * scale_std + scale_mean
+
+    # 9. 각 test 입력 윈도의 마지막 관측값을 cups 단위로 복원하여 persistence 예측 생성
+    pred_persistence = X_test[:, -1] * scale_std + scale_mean
+
+    # 10. 원본 train 구간의 평균 절대 일간 변화량으로 naive_scale 계산
+    naive_scale = np.mean(np.abs(np.diff(train_segment)))
+
+    # 11. 동일한 정답과 naive_scale로 persistence와 GRU의 평가지표 계산
+    metrics_persistence = compute_metrics(y_test_cups, pred_persistence, naive_scale)
+    metrics_rnn = compute_metrics(y_test_cups, pred_rnn, naive_scale)
+
+    # 12. 윈도 수, 반환 시 반올림한 상수, 두 모델의 평가지표를 딕셔너리로 반환
+    return {
+        "n_train": len(X_train),
+        "n_val": len(X_val),
+        "n_test": len(X_test),
+        "scale_mean": round(float(scale_mean), 4),
+        "scale_std": round(float(scale_std), 4),
+        "naive_scale": round(float(naive_scale), 4),
+        "persistence": metrics_persistence,
+        "rnn": metrics_rnn
+    }
 # ============================ END TODO (Task 4) ==============================
 
 
