@@ -22,8 +22,8 @@ import torch
 from torch import nn
 
 # ---- Fill in your information (used in results.json) ----
-STUDENT_ID = "00000000"   # TODO: your student id
-STUDENT_NAME = "None"     # TODO: your name in Korean or roman letters — "홍길동" / "HongGildong"
+STUDENT_ID = "20231879"   # TODO: your student id
+STUDENT_NAME = "LeeJeongyeon"     # TODO: your name in Korean or roman letters — "홍길동" / "HongGildong"
 
 SEED = 42  # fixed for the whole course — DO NOT CHANGE
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "machine_events.npz"
@@ -115,7 +115,23 @@ def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tens
     number. Dividing by sqrt(d_k) is not decoration: without it the scores grow
     with d_k, softmax saturates, and the gradients vanish.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+    # 1. 모든 query와 key 사이의 유사도 계산
+    scores = Q @ K.transpose(-2, -1)
+
+    # 2. query/key 차원의 제곱근으로 점수 크기 조절
+    scores = scores / torch.sqrt(torch.tensor(Q.shape[-1], dtype=scores.dtype))
+
+    # 3. mask가 있는 경우 차단할 위치의 점수를 음의 무한대로 변경
+    if mask is not None:
+        scores = scores.masked_fill(~mask, float("-inf"))
+
+    # 4. key 방향으로 softmax 적용 후 value 가중합 계산
+    attn = torch.softmax(scores, dim=-1)
+    output = attn @ V
+
+    return output, attn
+
 # =========================== END TODO (Task 1) ==============================
 
 
@@ -148,11 +164,33 @@ class MultiHeadAttention(nn.Module):
         d_k) gives the right shape with the wrong contents: it would cut the
         sequence into blocks instead of cutting each token's vector into heads.
         """
-        raise NotImplementedError
+        # raise NotImplementedError
+
+        # 1. 입력의 배치 크기와 시퀀스 길이 확인
+        batch_size, seq_len, d_model = x.shape
+
+        # 2. 각 토큰의 feature 차원을 head 수와 head 내부 차원으로 분리
+        x = x.view(batch_size, seq_len, self.n_heads, self.d_k)
+
+        # 3. head 축을 length 축 앞으로 이동 후 반환
+        x = x.transpose(1, 2)
+        return x
+
 
     def merge_heads(self, x: torch.Tensor) -> torch.Tensor:
         """(batch, n_heads, L, d_k) -> (batch, L, d_model). Inverse of split_heads."""
-        raise NotImplementedError
+        # raise NotImplementedError
+
+        # 1. 입력의 배치 크기와 시퀀스 길이 확인
+        batch_size, n_heads, seq_len, d_k = x.shape
+
+        # 2. head 축을 length 축 뒤로 이동
+        x = x.transpose(1, 2)
+
+        # 3. head와 head 내부 차원을 하나의 feature 차원으로 합친 후 반환
+        x = x.contiguous().view(batch_size, seq_len, self.d_model)
+        return x
+
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor | None = None
                 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -173,7 +211,24 @@ class MultiHeadAttention(nn.Module):
             (output, attn) with output (batch, L, d_model)
             and attn (batch, n_heads, L, L).
         """
-        raise NotImplementedError
+        # raise NotImplementedError
+
+        # 1. 입력을 Q, K, V로 각각 투영한 후 head로 분리
+        q = self.split_heads(self.w_q(x))
+        k = self.split_heads(self.w_k(x))
+        v = self.split_heads(self.w_v(x))
+
+        # 2. 마스크를 전달하여 모든 head의 attention을 한 번에 계산
+        context, attn = scaled_dot_product_attention(q, k, v, mask)
+
+        # 3. attention 출력의 head 병합
+        output = self.merge_heads(context)
+
+        # 4. 병합된 결과에 출력 투영 적용
+        output = self.w_o(output)
+
+        return output, attn
+
 # =========================== END TODO (Task 2) ==============================
 
 
@@ -190,8 +245,25 @@ def positional_encoding(max_len: int = MAX_LEN, d_model: int = D_MODEL) -> torch
         it broadcasts over the batch when you add it to the embeddings.
         d_model is assumed even.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
 
+    # 1. 위치 번호를 float32 세로 벡터로 생성
+    pos = torch.arange(max_len, dtype=torch.float32).unsqueeze(1)
+
+    # 2. sin/cos 쌍의 인덱스를 float32 벡터로 생성
+    i = torch.arange(d_model // 2, dtype=torch.float32)
+
+    # 3. 각 sin/cos 쌍에 사용할 분모 계산
+    denom = 10000 ** (2 * i / d_model)
+
+    # 4. 위치별·차원별 각도 계산
+    angle = pos / denom
+
+    # 5. float32 행렬의 짝수 열에 sin, 홀수 열에 cos 값 저장
+    pe = torch.zeros(max_len, d_model, dtype=torch.float32)
+    pe[:, 0::2] = torch.sin(angle)
+    pe[:, 1::2] = torch.cos(angle)
+    return pe.unsqueeze(0)
 
 class EncoderBlock(nn.Module):
     """One transformer encoder block, post-norm ordering.
@@ -232,7 +304,21 @@ class EncoderBlock(nn.Module):
             (output, attn) with output (batch, L, d_model)
             and attn (batch, n_heads, L, L).
         """
-        raise NotImplementedError
+        # raise NotImplementedError
+
+        # 1. 입력에 self-attention 적용
+        h, attn = self.attn(x, mask)
+
+        # 2. attention 입력과 출력을 더한 후 첫 번째 LayerNorm 적용
+        h = self.norm1(x + h)
+
+        # 3. FFN 입력과 출력을 더한 후 두 번째 LayerNorm 적용
+        h = self.norm2(h + self.ff(h))
+
+        # 4. encoder 출력과 attention 가중치 반환
+        return h, attn
+
+
 # =========================== END TODO (Task 3) ==============================
 
 
@@ -322,7 +408,26 @@ def run_experiment(data: dict) -> dict:
          "encoder_nopos": {...}, "encoder_pos": {...}}
         — one entry per key of CONFIGS, in the same order.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    # 1. 모든 설정의 결과를 저장할 빈 딕셔너리 생성
+    results = {}
+
+    # 2. CONFIGS에 정의된 순서대로 설정 순회
+    for name, (use_attention, use_positional) in CONFIGS.items():
+        # 3. 각 모델 생성 직전에 시드 초기화
+        set_seed(SEED)
+        
+        # 4. 현재 설정의 attention 및 positional encoding 사용 여부로 새 모델 생성
+        model = SeqClassifier(use_attention=use_attention, use_positional=use_positional)
+
+        # 5. 주어진 학습 함수로 모델 학습 및 평가
+        metrics = train_model(model, data)
+        # 6. 설정 이름을 키로 사용하여 평가 결과 저장
+        results[name] = metrics
+
+    return results
+
 # =========================== END TODO (Task 4) ==============================
 
 

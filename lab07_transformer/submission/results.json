@@ -1,0 +1,21 @@
+{
+  "lab": "lab07",
+  "student_id": "20231879",
+  "name": "LeeJeongyeon",
+  "seed": 42,
+  "metrics": {
+    "n_train": 3000,
+    "n_val": 1000,
+    "max_len": 16,
+    "vocab_size": 12,
+    "positive_rate": 0.517,
+    "mean_pool_accuracy": 0.471,
+    "mean_pool_loss": 0.7018,
+    "encoder_nopos_accuracy": 0.49,
+    "encoder_nopos_loss": 0.7003,
+    "encoder_pos_accuracy": 0.97,
+    "encoder_pos_loss": 0.1335,
+    "pe_gap": 0.48
+  },
+  "runtime_seconds": 9.48
+}
